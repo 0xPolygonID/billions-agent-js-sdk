@@ -95,7 +95,7 @@ export async function packDIDChallenge(
   };
 
   const token = await jws.pack(msgBytes, {
-    alg: "ES256K",
+    alg: "ES256K-R",
     did: payload.did,
     issuer: payload.did,
     keyType: keyId.type,
@@ -140,7 +140,7 @@ export async function packResponseArtifactsChallenge(
   };
 
   const token = await jws.pack(msgBytes, {
-    alg: "ES256K",
+    alg: "ES256K-R",
     did: payload.did,
     issuer: payload.did,
     keyType: keyId.type,
