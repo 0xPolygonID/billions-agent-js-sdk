@@ -57,31 +57,42 @@ Agent sents or returns transaction hash of an ownership attestation from the age
 
 ## Configuration
 
-Install dependencies using:
+1. Install dependencies:
+   ```
+   npm install
+   ```
 
-`npm install`
+2. Create a .env file by copying from .env.example:
+   ```
+   cp .env.example .env
+   ```
 
-Create a .env file by copying from .env.example:
-`cp .env.example .env`
+3. Fill in the required environment variables in .env:
 
-Fill in the required environment variables in .env:
-`OPENAI_API_KEY` – required to run the local model.
-`AGENT_API_URL` - agent endpoint required to run `attestAgent.ts` sample script
-`AGENT_DOMAIN` - agent domain
-`AGENT_FUND_AMOUNT_ETH` - Amount for agent funding to be able to send attestations to Attestation Registry
-`BLOCKCHAIN_RPC_URL` - blockchain RPC url for interacting with Attestation Registry
-`BLOCK_EXPLORER_URL` - blockchain explorer url
-`ATTESTATION_REGISTRY_CONTRACT_ADDRESS` - Attestation Registry contract address
-`AUTH_VERIFIER_CONTRACT_ADDRESS` - AuthVerifier contract address
-`ETH_PRIVATE_KEY` - private key to send transactions for attestations to Attestation Registry and for LIT protocol configuration
-`AGENT_OWNERSHIP_ATTESTATION_SCHEMA` - agent ownership attestation schema to send on-chain attestations
-`AGENT_DID_AUTH_ATTESTATION_SCHEMA` - agent DID auth attestation schema to send on-chain attestations
-`OWNER_ID` - Owner id of the agent
-`OWNER_ADDRESS` - Owner address of the agent
+   - `OPENAI_API_KEY` – required to run the local model.
+   - `AGENT_API_URL` - agent endpoint required to run `attestAgent.ts` sample script
+   - `AGENT_DOMAIN` - agent domain
+   - `AGENT_FUND_AMOUNT_ETH` - Amount for agent funding to be able to send attestations to Attestation Registry
+   - `BLOCKCHAIN_RPC_URL` - blockchain RPC url for interacting with Attestation Registry
+   - `BLOCK_EXPLORER_URL` - blockchain explorer url
+   - `ATTESTATION_REGISTRY_CONTRACT_ADDRESS` - Attestation Registry contract address
+   - `AUTH_VERIFIER_CONTRACT_ADDRESS` - AuthVerifier contract address
+   - `ETH_PRIVATE_KEY` - private key to send transactions for attestations to Attestation Registry and for LIT protocol configuration
+   - `AGENT_OWNERSHIP_ATTESTATION_SCHEMA` - agent ownership attestation schema to send on-chain attestations
+   - `AGENT_DID_AUTH_ATTESTATION_SCHEMA` - agent DID auth attestation schema to send on-chain attestations
+   - `OWNER_ID` - Owner id of the agent
+   - `OWNER_ADDRESS` - Owner address of the agent
 
-To start the server with the model locally:
+   You can generate the `OWNER_ID` and `OWNER_ADDRESS` from the `ETH_PRIVATE_KEY` executing this script:
+   ```
+   npm run generate:owner:info
+   ```
 
-`npm run start`
+
+4. To start the server with the model locally:
+   ```
+   npm run start
+   ```
 
 ### Run with Docker
 
@@ -115,4 +126,4 @@ Request Body:
 
 ## License
 
-billions-agent-js-sdk is part of the 0xPolygonID project copyright 2025 ZKID Labs AG
+billions-agent-js-sdk is part of the 0xPolygonID project copyright 2026 ZKID Labs AG
