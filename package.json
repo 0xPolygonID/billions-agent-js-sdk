@@ -30,7 +30,8 @@
     "format:check": "prettier \"src/**/*.ts\" \"tests/**/*.ts\" --check",
     "watch": "tsc --watch",
     "start": "node --env-file=.env --import tsx ./src/backend/server.ts",
-    "attest:agent": "node --env-file=.env --import tsx ./scripts/attestAgent.ts"
+    "attest:agent": "node --env-file=.env --import tsx ./scripts/attestAgent.ts",
+    "generate:owner:info": "node --env-file=.env --import tsx ./scripts/generateOwnerInfo.ts"
   },
   "repository": {
     "type": "git",

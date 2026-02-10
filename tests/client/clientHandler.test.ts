@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("Client Handler", async () => {
   const url = "http://localhost:8888/api/v1/completions";
-  const rpcUrl = "https://billions-testnet-rpc.eu-north-2.gateway.fm";
+  const rpcUrl = "https://rpc-testnet.billions.network";
 
   const ethPrivateKey = "<put your private key here for testing purposes>";
   const attestationRegistryAddress =
