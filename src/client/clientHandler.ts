@@ -717,7 +717,8 @@ export class ClientHandler implements IClientHandler {
     );
 
     const base64AgentURI = bytesToBase64(
-      byteEncoder.encode(JSON.stringify(agentURI))
+      byteEncoder.encode(JSON.stringify(agentURI)),
+      { pad: true }
     );
     const tx = await identityRegistry["register(string)"](
       `data:application/json;base64,${base64AgentURI}`
