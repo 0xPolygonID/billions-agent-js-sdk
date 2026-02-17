@@ -42,7 +42,7 @@ describe("JWS", async () => {
     };
 
     const packed = await jws.pack(msgBytes, {
-      alg: "ES256K-R",
+      alg: "ES256K",
       did,
       issuer: did,
       keyType,

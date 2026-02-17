@@ -105,7 +105,7 @@ This will expose the service on http://localhost:8888.
 
 ### Interaction with model
 
-To test the model using a script and `.env`, run: `node --env-file=.env --import tsx ./scripts/attestAgent.ts`
+To test the model using a script and `.env`, run: `npm run attest:agent`
 Alternatively, you can use tools like Postman or cURL.
 
 API Endpoint:
