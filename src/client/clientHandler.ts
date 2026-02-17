@@ -14,7 +14,7 @@ import { ethers, TransactionRequest } from "ethers";
 import {
   buildDIDFromEthAddress,
   byteEncoder,
-  bytesToBase64url,
+  bytesToBase64,
   hexToBytes,
   KmsKeyType,
 } from "@0xpolygonid/js-sdk";
@@ -473,7 +473,7 @@ export class ClientHandler implements IClientHandler {
   /**
    * Sends an ownership attestation from the agent response to the attestation registry.
    * @param {AgentResponse} AgentResponse - The agent response to prove owner request.
-   * @returns {bigint} the attestation ID created in the attestation registry.
+   * @returns {Promise<{ attestationId: string; txHash: string }>} An object containing the created attestation ID and transaction hash.
    */
   async sendOwnershipAttestation(ownershipData: {
     agentId: string;
@@ -524,7 +524,7 @@ export class ClientHandler implements IClientHandler {
    * @param {string} agentId - The agent ID from the agent's perspective (DID ID).
    * @param {string} agentAddress - The Ethereum address of the agent.
    * @param {string} ownerId - The owner ID from the agent's perspective (DID ID).
-   * @returns {bigint} the attestation ID created in the attestation registry.
+   * @returns {Promise<{ attestationId: string; txHash: string }>} An object containing the created attestation ID and transaction hash.
    */
   async sendERC8004Attestation(
     ERC8004AgentId: string,
@@ -539,7 +539,7 @@ export class ClientHandler implements IClientHandler {
       [
         this._erc8004Config.chainId,
         this._erc8004Config.identityRegistryAddress,
-        ERC8004AgentId,
+        BigInt(ERC8004AgentId),
       ]
     );
 
@@ -716,7 +716,7 @@ export class ClientHandler implements IClientHandler {
       wallet
     );
 
-    const base64AgentURI = bytesToBase64url(
+    const base64AgentURI = bytesToBase64(
       byteEncoder.encode(JSON.stringify(agentURI))
     );
     const tx = await identityRegistry["register(string)"](
@@ -740,6 +740,9 @@ export class ClientHandler implements IClientHandler {
         agentId = parsedLog.args.agentId;
       }
     }
+    if (!agentId) {
+      throw new Error("Failed to retrieve agent ID from registration event");
+    }
     return agentId;
   }
 
@@ -760,7 +763,7 @@ export class ClientHandler implements IClientHandler {
       wallet
     );
 
-    const base64AgentURI = bytesToBase64url(
+    const base64AgentURI = bytesToBase64(
       byteEncoder.encode(JSON.stringify(agentURI)),
       { pad: true }
     );
