@@ -1,11 +1,11 @@
 import { decodeAuthToken, verifyAgentResponse } from "../utils";
 import {
   AttestationData,
-  AuthDidPayload,
-  ProveOwnerPayload,
-  ResponseChallengePayload,
+  type AuthDidPayload,
+  type ProveOwnerPayload,
+  type ResponseChallengePayload,
 } from "../agentkit/types";
-import { AgentResponse } from "./types";
+import { type AgentResponse, type AgentURI } from "./types";
 import { generateChallenge, packOwnerAuthDid } from "../agentkit/func-utils";
 import attestationRegistryABI from "./abi/AttestationRegistry.json";
 import authVerifierABI from "./abi/AuthVerifier.json";
@@ -13,6 +13,8 @@ import stateABI from "./abi/State.json";
 import { ethers, TransactionRequest } from "ethers";
 import {
   buildDIDFromEthAddress,
+  byteEncoder,
+  bytesToBase64,
   hexToBytes,
   KmsKeyType,
 } from "@0xpolygonid/js-sdk";
@@ -25,6 +27,7 @@ import {
   NetworkId,
 } from "@iden3/js-iden3-core";
 import { EthereumWallet } from "../agentkit";
+import identityRegistryUpgradeableABI from "./abi/IdentityRegistryUpgradeable.json";
 
 /* eslint-disable no-console */
 
@@ -138,6 +141,12 @@ export class ClientHandler implements IClientHandler {
     attestationRegistryAddress: string;
     agentDidAuthSchemaId: string;
     agentOwnershipSchemaId: string;
+    erc8004AttestationSchemaId: string;
+  };
+  protected _erc8004Config: {
+    rpcUrl: string;
+    chainId: number;
+    identityRegistryAddress: string;
   };
 
   /**
@@ -150,6 +159,11 @@ export class ClientHandler implements IClientHandler {
    * - attestationRegistryAddress - The address of the AttestationRegistry contract.
    * - agentDidAuthSchemaId - The schema ID for DID authentication attestations.
    * - agentOwnershipSchemaId - The schema ID for ownership attestations.
+   * - erc8004AttestationSchemaId - The schema ID for ERC-8004 attestations, if applicable.
+   * @param erc8004Config - The ERC-8004 specific blockchain configuration including:
+   * - rpcUrl - The RPC URL of the blockchain network for ERC-8004 interactions.
+   * - chainId - The chain ID of the blockchain network for ERC-8004 interactions.
+   * - identityRegistryAddress - The address of the IdentityRegistry contract for ERC-8004 interactions.
    */
   constructor(
     agentUrl: string,
@@ -160,10 +174,17 @@ export class ClientHandler implements IClientHandler {
       attestationRegistryAddress: string;
       agentDidAuthSchemaId: string;
       agentOwnershipSchemaId: string;
+      erc8004AttestationSchemaId: string;
+    },
+    erc8004Config: {
+      rpcUrl: string;
+      chainId: number;
+      identityRegistryAddress: string;
     }
   ) {
     this._agentUrl = agentUrl;
     this._blockchainConfig = blockchainConfig;
+    this._erc8004Config = erc8004Config;
   }
 
   /**
@@ -452,7 +473,7 @@ export class ClientHandler implements IClientHandler {
   /**
    * Sends an ownership attestation from the agent response to the attestation registry.
    * @param {AgentResponse} AgentResponse - The agent response to prove owner request.
-   * @returns {bigint} the attestation ID created in the attestation registry.
+   * @returns {Promise<{ attestationId: string; txHash: string }>} An object containing the created attestation ID and transaction hash.
    */
   async sendOwnershipAttestation(ownershipData: {
     agentId: string;
@@ -487,6 +508,58 @@ export class ClientHandler implements IClientHandler {
         did: agentDid,
         iden3Id: BigInt(ownershipData.agentId),
         ethereumAddress: ownershipData.agentAddress,
+      },
+      expirationTime: 0, // No expiration
+      revocable: true,
+      refId: ethers.ZeroHash,
+      data: encodedData,
+    };
+
+    return this.sendAttestation(attestationData);
+  }
+
+  /**
+   * Sends an ERC8004 Agent Registry attestation to the attestation registry.
+   * @param {string} ERC8004AgentId - The agent ID from ERC8004 Agent Registry.
+   * @param {string} agentId - The agent ID from the agent's perspective (DID ID).
+   * @param {string} agentAddress - The Ethereum address of the agent.
+   * @param {string} ownerId - The owner ID from the agent's perspective (DID ID).
+   * @returns {Promise<{ attestationId: string; txHash: string }>} An object containing the created attestation ID and transaction hash.
+   */
+  async sendERC8004Attestation(
+    ERC8004AgentId: string,
+    agentId: string,
+    agentAddress: string,
+    ownerId: string
+  ): Promise<{ attestationId: string; txHash: string }> {
+    const { wallet, attesterId } = await this.getBlockchainArtifacts();
+
+    const encodedData = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["uint256", "address", "uint256"],
+      [
+        this._erc8004Config.chainId,
+        this._erc8004Config.identityRegistryAddress,
+        BigInt(ERC8004AgentId),
+      ]
+    );
+
+    const agentDid = DID.parseFromId(Id.fromBigInt(BigInt(agentId))).string();
+
+    const attesterDid = DID.parseFromId(
+      Id.fromBigInt(BigInt(ownerId))
+    ).string();
+
+    const attestationData: AttestationData = {
+      schemaId: this._blockchainConfig.erc8004AttestationSchemaId,
+      attester: {
+        did: attesterDid,
+        iden3Id: attesterId,
+        ethereumAddress: wallet.address,
+      },
+      recipient: {
+        did: agentDid,
+        iden3Id: BigInt(agentId),
+        ethereumAddress: agentAddress,
       },
       expirationTime: 0, // No expiration
       revocable: true,
@@ -625,5 +698,81 @@ export class ClientHandler implements IClientHandler {
   async getEthereumAddress(): Promise<string> {
     const { wallet } = await this.getBlockchainArtifacts();
     return wallet.address;
+  }
+
+  /**
+   * Registers the agent on-chain using ERC-8004 IdentityRegistryUpgradeable contract by sending a transaction.
+   * @return {bigint} the agent ID created in the IdentityRegistryUpgradeable contract.
+   */
+  async registerAgentERC8004(agentURI: AgentURI): Promise<bigint> {
+    const wallet = new ethers.Wallet(
+      this._blockchainConfig.ethPrivateKey,
+      new ethers.JsonRpcProvider(this._erc8004Config.rpcUrl)
+    );
+
+    const identityRegistry = new ethers.Contract(
+      this._erc8004Config.identityRegistryAddress,
+      identityRegistryUpgradeableABI,
+      wallet
+    );
+
+    const base64AgentURI = bytesToBase64(
+      byteEncoder.encode(JSON.stringify(agentURI)),
+      { pad: true }
+    );
+    const tx = await identityRegistry["register(string)"](
+      `data:application/json;base64,${base64AgentURI}`
+    );
+    const receipt = await tx.wait();
+    const eventInterface = identityRegistry.interface;
+    const registeredEvent = receipt.logs.find((log: any) => {
+      try {
+        const parsedLog = identityRegistry.interface.parseLog(log);
+        return parsedLog?.name === "Registered";
+      } catch {
+        return false;
+      }
+    });
+
+    let agentId;
+    if (registeredEvent) {
+      const parsedLog = eventInterface.parseLog(registeredEvent);
+      if (parsedLog) {
+        agentId = parsedLog.args.agentId;
+      }
+    }
+    if (!agentId) {
+      throw new Error("Failed to retrieve agent ID from registration event");
+    }
+    return agentId;
+  }
+
+  /**
+   * Sets the agent URI on-chain using ERC-8004 IdentityRegistryUpgradeable contract by sending a transaction with the agent URI encoded in the data field.
+   * @param agentId - The ID of the agent to set the URI for.
+   * @param agentURI - The agent URI object containing metadata and service information about the agent.
+   */
+  async setAgentURI(agentId: bigint, agentURI: AgentURI): Promise<void> {
+    const wallet = new ethers.Wallet(
+      this._blockchainConfig.ethPrivateKey,
+      new ethers.JsonRpcProvider(this._erc8004Config.rpcUrl)
+    );
+
+    const identityRegistry = new ethers.Contract(
+      this._erc8004Config.identityRegistryAddress,
+      identityRegistryUpgradeableABI,
+      wallet
+    );
+
+    const base64AgentURI = bytesToBase64(
+      byteEncoder.encode(JSON.stringify(agentURI)),
+      { pad: true }
+    );
+
+    const tx = await identityRegistry.setAgentURI(
+      agentId,
+      `data:application/json;base64,${base64AgentURI}`
+    );
+    await tx.wait();
   }
 }

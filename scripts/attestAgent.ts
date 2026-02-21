@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { ClientHandler } from "../src";
+import { AgentURI, ClientHandler } from "../src";
 import { generateChallenge } from "../src/agentkit/func-utils";
 import { DID, Id } from "@iden3/js-iden3-core";
 import { AuthDidPayload, ProveOwnerPayload } from "../src/agentkit/types";
@@ -40,17 +40,28 @@ async function verifyAgentResponse(client: ClientHandler, agentResponse: any) {
  * - Verify the ownership attestation from on-chain data
  */
 async function main() {
-  const client = new ClientHandler(process.env.AGENT_API_URL as string, {
-    rpcUrl: process.env.BLOCKCHAIN_RPC_URL as string,
-    ethPrivateKey: process.env.ETH_PRIVATE_KEY as string,
-    attestationRegistryAddress: process.env
-      .ATTESTATION_REGISTRY_CONTRACT_ADDRESS as string,
-    authVerifierAddress: process.env.AUTH_VERIFIER_CONTRACT_ADDRESS as string,
-    agentDidAuthSchemaId: process.env
-      .AGENT_DID_AUTH_ATTESTATION_SCHEMA as string,
-    agentOwnershipSchemaId: process.env
-      .AGENT_OWNERSHIP_ATTESTATION_SCHEMA as string,
-  });
+  const client = new ClientHandler(
+    process.env.AGENT_API_URL as string,
+    {
+      rpcUrl: process.env.BLOCKCHAIN_RPC_URL as string,
+      ethPrivateKey: process.env.ETH_PRIVATE_KEY as string,
+      attestationRegistryAddress: process.env
+        .ATTESTATION_REGISTRY_CONTRACT_ADDRESS as string,
+      authVerifierAddress: process.env.AUTH_VERIFIER_CONTRACT_ADDRESS as string,
+      agentDidAuthSchemaId: process.env
+        .AGENT_DID_AUTH_ATTESTATION_SCHEMA as string,
+      agentOwnershipSchemaId: process.env
+        .AGENT_OWNERSHIP_ATTESTATION_SCHEMA as string,
+      erc8004AttestationSchemaId: process.env
+        .ERC8004_ATTESTATION_SCHEMA as string,
+    },
+    {
+      rpcUrl: process.env.ERC8004_BLOCKCHAIN_RPC_URL as string,
+      chainId: Number(process.env.ERC8004_CHAIN_ID),
+      identityRegistryAddress: process.env
+        .ERC8004_IDENTITY_REGISTRY_CONTRACT_ADDRESS as string,
+    }
+  );
 
   const wallet = new ethers.Wallet(
     process.env.ETH_PRIVATE_KEY as string,
@@ -324,6 +335,64 @@ async function main() {
     ` ✅ Agent ownership attestation from agent successfully verified from on-chain data.`
   );
   console.log("10. Agent successfully proved owner.");
+
+  const agentURI: AgentURI = {
+    type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+    name: `Billions Agent ${decodedDid.string()}`,
+    description:
+      "Agent built with Billions Agent JS-SDK using decentralized identity and Billions on-chain attestations",
+    image: "",
+    services: [
+      {
+        name: "DID",
+        endpoint: decodedDid.string(),
+        version: "v1",
+      },
+    ],
+    active: true,
+    x402Support: false,
+    registrations: [],
+    supportedTrust: ["reputation", "attestations"],
+    tags: [
+      "ethereum",
+      "billions",
+      "trust",
+      "did",
+      "attestations",
+      "privadoID",
+      "iden3",
+    ],
+  };
+  const agentId = await client.registerAgentERC8004(agentURI);
+  console.log(
+    `11. Agent registered with ERC-8004 with Agent ID: ${agentId.toString()}`
+  );
+  console.log(` 🆔 ERC8004 Agent ID: ${agentId.toString()}`);
+
+  agentURI.registrations = [
+    {
+      agentId: Number(agentId),
+      agentRegistry: `eip155:${process.env.ERC8004_CHAIN_ID as string}:${
+        process.env.ERC8004_IDENTITY_REGISTRY_CONTRACT_ADDRESS as string
+      }`,
+    },
+  ];
+  await client.setAgentURI(agentId, agentURI);
+  console.log(` ✅ set agentURI for Agent ID ${agentId.toString()}`);
+
+  const {
+    attestationId: erc8004AttestationId,
+    txHash: txHashERC8004AttestationFromOwner,
+  } = await client.sendERC8004Attestation(
+    agentId.toString(),
+    ownershipData.agentId,
+    ownershipData.agentAddress,
+    ownershipData.ownerId
+  );
+  console.log(
+    `12. User sent attestation for Agent ERC8004 registration in attestation registry. Transaction hash: ${txHashERC8004AttestationFromOwner}`
+  );
+  console.log(` 🆔 Attestation Id: ${erc8004AttestationId}`);
 }
 
 main()
